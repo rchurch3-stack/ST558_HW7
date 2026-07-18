@@ -5,3 +5,44 @@ editor: visual
 author: Evan Whitfield, Ralph Church, Ryan Friedman
 ---
 
+### Reading in the Data
+
+First, load the libraries needed for importing and working with the dataset.
+
+```{r}
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(janitor)
+```
+
+Next, read the CSV file into R using the `read_csv()` function from the **readr** package.
+
+```{r}
+bike <- read_csv(
+  "Data/SeoulBikeData.csv",
+  locale = locale(encoding = "Windows-1252"),
+  show_col_types = FALSE
+) |>
+  clean_names()
+
+# convert few of variables to factors
+bike <- bike |>
+  mutate(
+    date = as.Date(date, format = "%d/%m/%Y"),
+    across(
+      c(seasons, holiday, functioning_day),
+      as.factor
+    )
+  )
+```
+
+Finally, inspect the data to verify that it was imported correctly.
+
+```{r}
+head(bike)
+glimpse(bike)
+summary(bike)
+```
+
+The dataset is stored in the object `bike`, which will be used throughout the analysis. The `head()` function displays the first few rows, `glimpse()` provides the structure and variable types, and `summary()` gives descriptive statistics for each variable.

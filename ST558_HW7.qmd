@@ -1,0 +1,7 @@
+---
+title: "ST558_HW7"
+format: html
+editor: visual
+author: Evan Whitfield, Ralph Church, Ryan Friedman
+---
+

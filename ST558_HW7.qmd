@@ -14,6 +14,7 @@ library(readr)
 library(dplyr)
 library(ggplot2)
 library(janitor)
+library(tidymodels)
 ```
 
 Next, read the CSV file into R using the `read_csv()` function from the **readr** package.
@@ -46,3 +47,37 @@ summary(bike)
 ```
 
 The dataset is stored in the object `bike`, which will be used throughout the analysis. The `head()` function displays the first few rows, `glimpse()` provides the structure and variable types, and `summary()` gives descriptive statistics for each variable.
+
+### Check for missing values
+
+```{r}
+missing_values <- data.frame(
+  Variable = names(bike),
+  Missing_Values = colSums(is.na(bike))
+)
+
+missing_values
+```
+
+The dataset has no missing values, so no data needed to be removed or filled in before the analysis.
+
+### Split the training set
+
+```{r}
+set.seed(10)
+
+bike_split <- initial_split(bike, prop = 0.70)
+
+bike_train <- training(bike_split)
+bike_test <- testing(bike_split)
+
+bike_train
+bike_test
+```
+
+Next, verify the size of each dataset using **dim()**
+
+```{r}
+dim(bike_train)
+dim(bike_test)
+```

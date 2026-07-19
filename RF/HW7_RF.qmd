@@ -293,3 +293,126 @@ bike_10_fold <- vfold_cv(bike_train, 10)
 
 
 ## Fit three different MLR models on the training data using 10 fold CV to find best model
+
+- Create the first recipe:
+
+```{r}
+recipe(bike_count ~ ., data = bike_train) |>
+  step_date(date, features = c("dow")) |> # get day of week from date
+  step_mutate(day_type = factor(if_else(date_dow %in% c("Sat", "Sun"), "weekend", "weekday"))) |> # create day_type factor based on weekday or weekend
+  step_rm(date, date_dow) |> # date and date_dow are not used
+  step_normalize(all_numeric(), -all_outcomes()) |> # center and scale all numeric predictors.  exclude the outcome
+  step_dummy(season, holiday, day_type) |> # create dummy values for categorical variables
+  prep(training = bike_train) |>
+  bake(bike_train)
+```
+
+- Looks good.  Save it as `first_rec`
+
+```{r}
+first_rec <- recipe(bike_count ~ ., data = bike_train) |>
+  step_date(date, features = c("dow")) |> # get day of week from date
+  step_mutate(day_type = factor(if_else(date_dow %in% c("Sat", "Sun"), "weekend", "weekday"))) |> # create day_type factor based on weekday or weekend
+  step_rm(date, date_dow) |> # date and date_dow are not used
+  step_normalize(all_numeric(), -all_outcomes()) |> # center and scale all numeric predictors.  exclude the outcome
+  step_dummy(season, holiday, day_type) # create dummy values for categorical variables
+
+first_rec |> prep() |> bake(new_data = NULL) |> names()
+# looks right
+```
+
+- Create the second recipe, now adding interaction effects between seasons and holiday, seasons and temp, temp and rainfall.
+
+```{r}
+second_rec <- recipe(bike_count ~ ., data = bike_train) |>
+  step_date(date, features = c("dow")) |> # get day of week from date
+  step_mutate(day_type = factor(if_else(date_dow %in% c("Sat", "Sun"), "weekend", "weekday"))) |> # create day_type factor based on weekday or weekend
+  step_rm(date, date_dow) |> # date and date_dow are not used
+  step_normalize(all_numeric(), -all_outcomes()) |> # center and scale all numeric predictors.  exclude the outcome
+  step_dummy(season, holiday, day_type) |> # create dummy values for categorical variables
+  step_interact(terms = ~ starts_with("holiday"):starts_with("season")) |> # interaction between season and holiday effects
+  step_interact(terms = ~ temp:starts_with("season")) |> # interaction between season and temp effects
+  step_interact(terms = ~ temp:rain) # interaction between temp and rain effects
+
+# Note:  important to have starts_with("holiday"):starts_with("season") in that order, otherwise starts_with("season") won't work as intended on next line
+
+second_rec |> prep() |> bake(new_data = NULL) |> names()
+# looks right   
+```
+
+- Create the third recipe, adding in quadratic terms for each numeric predictor
+
+```{r}
+third_rec <- recipe(bike_count ~ ., data = bike_train) |>
+  step_date(date, features = c("dow")) |> # get day of week from date
+  step_mutate(day_type = factor(if_else(date_dow %in% c("Sat", "Sun"), "weekend", "weekday"))) |> # create day_type factor based on weekday or weekend
+  step_rm(date, date_dow) |> # date and date_dow are not used
+  step_normalize(all_numeric(), -all_outcomes()) |> # center and scale all numeric predictors.  exclude the outcome
+  step_dummy(season, holiday, day_type) |> # create dummy values for categorical variables
+  step_interact(terms = ~ starts_with("holiday"):starts_with("season")) |> # interaction between season and holiday effects
+  step_interact(terms = ~ temp:starts_with("season")) |> # interaction between season and temp effects
+  step_interact(terms = ~ temp:rain) |> # interaction between temp and rain effects
+  step_mutate(rain_sq = rain^2, # adding quadratic terms
+              snow_sq = snow^2,
+              temp_sq = temp^2,
+              hum_sq = hum^2,
+              wind_sq = wind^2,
+              vis_sq = vis^2,
+              dewpt = dewpt^2,
+              solrad_sq = solrad^2)
+
+third_rec |> prep() |> bake(new_data = NULL) |> names()
+# looks right
+```
+
+- Fit the models on the 10 fold CV to determine which is best
+
+```{r}
+# Set up the model
+bike_mod <- linear_reg() |>
+  set_engine("lm")
+
+# Set up three workflows
+first_wfl <- workflow() |>
+  add_recipe(first_rec) |>
+  add_model(bike_mod)
+second_wfl <- workflow() |>
+  add_recipe(second_rec) |>
+  add_model(bike_mod)
+third_wfl <- workflow() |>
+  add_recipe(third_rec) |>
+  add_model(bike_mod)
+```
+
+```{r}
+# Fit the first model
+first_cv_fits <- first_wfl |>
+  fit_resamples(bike_10_fold)
+```
+```{r}
+# Fit the second model
+second_cv_fits <- second_wfl |>
+  fit_resamples(bike_10_fold)
+```
+
+```{r}
+# Fit the third model
+third_cv_fits <- third_wfl |>
+  fit_resamples(bike_10_fold)
+```
+
+
+```{r}
+rbind(first_cv_fits |> collect_metrics(),
+      second_cv_fits |> collect_metrics(),
+      third_cv_fits |> collect_metrics())
+```
+
+- Looks like the third model (with interaction effects and quadratic terms) has the lowest mean RMSE (2970.3 vs 3079.8 and 4248.0).
+
+- Now
+
+```{r}
+
+```
+

@@ -1,0 +1,295 @@
+---
+title: "HW7_RF"
+format: html
+---
+
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(lubridate)
+library(janitor)
+library(gt)
+```
+
+## Read in the data
+
+```{r}
+# adding locale= to fix Error in nchar(x, "width") : invalid multibyte string, element 1
+bike <- read_csv("../Data/SeoulBikeData.csv", locale=locale(encoding="latin1"))
+bike
+```
+
+## Conduct Basic EDA
+
+- Begin with `str()` and `summary()` to examine variables
+
+```{r}
+str(bike)
+```
+
+```{r}
+summary(bike)
+```
+- Notes on the above:
+
+  - 14 variables.  Some numeric and some categorical. Numeric are correctly coming in as numbers
+  
+  - 8760 rows = 365 days x 24 hours
+  
+  - Categorical variable unique values: 365 dates, 4 seasons, 2 (Y/N) for holiday, 2 (Y/N) for functioning day
+
+- Fix variable names
+
+```{r}
+colnames(bike) <- c("date", "bike_count", "hour", "temp", "hum", "wind", "vis", "dewpt", "solrad", "rain", "snow", "season", "holiday", "functioning")
+colnames(bike)
+```
+
+- Fix the date and turn the appropriate variables into factors
+
+```{r}
+bike <- bike |> 
+  mutate(date = dmy(date), # fix dates
+         season = factor(season), # set as factors
+         holiday = factor(holiday),
+         functioning = factor(functioning))  
+  
+```
+
+- Create some summary statistics
+
+```{r}
+bike |>
+  group_by(functioning) |>
+  summarize(n.bike_count = n(),
+            across(.cols = c(bike_count),
+                   list("mean" = ~ mean(.x, na.rm = TRUE),
+                        "median" = ~ median(.x, na.rm = TRUE),
+                        "sd" = ~ sd(.x, na.rm = TRUE),
+                        "Q1" = ~ quantile(.x, 0.25, na.rm = TRUE),
+                        "Q3" = ~ quantile(.x, 0.75, na.rm = TRUE),
+                        "min" = ~ min(.x, na.rm = TRUE),
+                        "max" = ~ max(.x, na.rm = TRUE)),
+                   .names = "{.fn}.{.col}")) |> # creates names from the variable and the statistic
+  pivot_longer(
+    cols = -functioning, # exclude functioning from the pivot
+    names_to = c("Statistic", "Variable"),
+    names_sep = "\\.") |>
+  pivot_wider(
+    names_from = Statistic,
+    values_from = value) |>
+  gt(groupname_col = "functioning", rowname_col = "Variable") |> # organizes the Variable column by functioning and removes the "Variable" title
+  fmt_number(decimals = 1) |> # rounds everything to 1 decimals
+  tab_header(
+    title = "Bike Count: Mean, Median, SD, Q1, and Q3",
+    subtitle = "Stratified by functioning")
+```
+
+- Note:  count is zero for all non-functioning observations.  Going forwards, lets subset to omit non-functioning observations
+
+```{r}
+bike_valid <- bike |>
+  filter(functioning == "Yes")
+```
+
+- Summarize across hours.  Use the sum of bike_count, rain, and snow.  Use the mean of temp, hum, wind, vis, dewpt, solrad
+
+```{r}
+bike_day <- bike_valid |>
+  group_by(date, season, holiday) |>
+  summarize(
+    across(.cols = c(bike_count, rain, snow),  ~ sum(.x, na.rm = TRUE)), # sum variables
+    across(.cols = c(temp, hum, wind, vis, dewpt, solrad), ~ mean(.x, na.rm = TRUE)), # mean variables
+    .groups = "drop" # used to silence the output message
+  )
+```
+
+- Take a look at some summary stats and plots after summarizing across hours
+
+```{r}
+summary(bike_day)
+```
+
+```{r}
+bike_day |>
+  group_by(season) |>
+  summarize(n.bike_count = n(),
+            across(.cols = c(bike_count),
+                   list("mean" = ~ mean(.x, na.rm = TRUE),
+                        "median" = ~ median(.x, na.rm = TRUE),
+                        "sd" = ~ sd(.x, na.rm = TRUE),
+                        "Q1" = ~ quantile(.x, 0.25, na.rm = TRUE),
+                        "Q3" = ~ quantile(.x, 0.75, na.rm = TRUE),
+                        "min" = ~ min(.x, na.rm = TRUE),
+                        "max" = ~ max(.x, na.rm = TRUE)),
+                   .names = "{.fn}.{.col}")) |> # creates names from the variable and the statistic
+  pivot_longer(
+    cols = -season, # exclude season from the pivot
+    names_to = c("Statistic", "Variable"),
+    names_sep = "\\.") |>
+  pivot_wider(
+    names_from = Statistic,
+    values_from = value) |>
+  gt(groupname_col = "season", rowname_col = "Variable") |> # organizes the Variable column by season and removes the "Variable" title
+  fmt_number(decimals = 1) |> # rounds everything to 1 decimals
+  tab_header(
+    title = "Bike Count: Mean, Median, SD, Q1, and Q3",
+    subtitle = "Stratified by season")
+
+# bike count is lowest in winter and highest in autumn and summer
+```
+
+```{r}
+bike_day |>
+  group_by(holiday) |>
+  summarize(n.bike_count = n(),
+            across(.cols = c(bike_count),
+                   list("mean" = ~ mean(.x, na.rm = TRUE),
+                        "median" = ~ median(.x, na.rm = TRUE),
+                        "sd" = ~ sd(.x, na.rm = TRUE),
+                        "Q1" = ~ quantile(.x, 0.25, na.rm = TRUE),
+                        "Q3" = ~ quantile(.x, 0.75, na.rm = TRUE),
+                        "min" = ~ min(.x, na.rm = TRUE),
+                        "max" = ~ max(.x, na.rm = TRUE)),
+                   .names = "{.fn}.{.col}")) |> # creates names from the variable and the statistic
+  pivot_longer(
+    cols = -holiday, # exclude holiday from the pivot
+    names_to = c("Statistic", "Variable"),
+    names_sep = "\\.") |>
+  pivot_wider(
+    names_from = Statistic,
+    values_from = value) |>
+  gt(groupname_col = "holiday", rowname_col = "Variable") |> # organizes the Variable column by holiday and removes the "Variable" title
+  fmt_number(decimals = 1) |> # rounds everything to 1 decimals
+  tab_header(
+    title = "Bike Count: Mean, Median, SD, Q1, and Q3",
+    subtitle = "Stratified by holiday")
+
+#  bike count is higher on average on non-holidays
+```
+
+```{r}
+# Check correlation across all numeric variables
+
+bike_day |>
+  select(where(is.numeric)) |>
+  cor() |>
+  round(2)
+
+# temp, dewpt, and solrad have the strongest correlation with bike count
+```
+
+
+```{r}
+# Bike Count vs Temp
+
+g <- ggplot(bike_day,
+            aes(x = temp, y = bike_count))
+g + geom_point(alpha = 1, size = 0.9) + 
+  annotate("text",
+           x = -10, y = 30000,
+           label = paste("r =", round(cor(bike_day$temp, bike_day$bike_count),2))) + # calculate correlation and place on graph
+  labs(x = "Temp (C)",
+       y = "Bike Count",
+       title = "Bike Count vs Temp") +
+  theme(plot.title = element_text(hjust = 0.5)) # Centers the title
+```
+
+```{r}
+# Bike Count vs Rain
+
+g <- ggplot(bike_day,
+            aes(x = rain, y = bike_count))
+g + geom_point(alpha = 1, size = 0.9) + 
+  annotate("text",
+           x = 50, y = 30000,
+           label = paste("r =", round(cor(bike_day$rain, bike_day$bike_count),2))) + # calculate correlation and place on graph
+  labs(x = "Rain (mm)",
+       y = "Bike Count",
+       title = "Bike Count vs Rain") +
+  theme(plot.title = element_text(hjust = 0.5)) # Centers the title
+```
+
+```{r}
+# Bike Count vs snow
+
+g <- ggplot(bike_day,
+            aes(x = snow, y = bike_count))
+g + geom_point(alpha = 1, size = 0.9) + 
+  annotate("text",
+           x = 30, y = 30000,
+           label = paste("r =", round(cor(bike_day$snow, bike_day$bike_count),2))) + # calculate correlation and place on graph
+  labs(x = "Snow (cm)",
+       y = "Bike Count",
+       title = "Bike Count vs Snow") +
+  theme(plot.title = element_text(hjust = 0.5)) # Centers the title
+```
+
+```{r}
+# Rain vs Humidity
+
+g <- ggplot(bike_day,
+            aes(x = hum, y = rain))
+g + geom_point(alpha = 1, size = 0.9) + 
+  annotate("text",
+           x = 40, y = 60,
+           label = paste("r =", round(cor(bike_day$hum, bike_day$rain),2))) + # calculate correlation and place on graph
+  labs(x = "Humidity (%)",
+       y = "Rain (mm)",
+       title = "Rain vs Humidity") +
+  theme(plot.title = element_text(hjust = 0.5)) # Centers the title
+```
+
+```{r}
+# Bike Count vs Season
+
+g <- ggplot(bike_day)
+g + geom_boxplot(aes(x = season, y = bike_count, fill = season)) +
+  labs(x = "Season",
+       y = "Bike Count",
+       title = "Bike Count by Season") + 
+  theme(plot.title = element_text(hjust = 0.5), # Centers the title
+        legend.position = "none") # remove redundant legend
+```
+
+```{r}
+# Bike Count vs Holiday
+
+g <- ggplot(bike_day)
+g + geom_boxplot(aes(x = holiday, y = bike_count, fill = holiday)) +
+  labs(x = "Holiday",
+       y = "Bike Count",
+       title = "Bike Count by Holiday") + 
+  theme(plot.title = element_text(hjust = 0.5), # Centers the title
+        legend.position = "none") # remove redundant legend
+```
+
+## Split the data and create 10-fold CV
+
+- Split the data 75/25 for training and test
+
+```{r}
+set.seed(10)
+
+# split 75/25, stratifying by season
+bike_split <- initial_split(bike_day, prop = 0.75, strata = season)
+bike_train <- training(bike_split)
+bike_test <- testing(bike_split)
+
+# check counts and stratification of each
+bike_train |> 
+  group_by(season) |>
+  summarize(count = n())
+bike_test |> 
+  group_by(season) |>
+  summarize(count = n())
+```
+
+- Create 10 fold CV split
+
+```{r}
+bike_10_fold <- vfold_cv(bike_train, 10)
+```
+
+
+## Fit three different MLR models on the training data using 10 fold CV to find best model

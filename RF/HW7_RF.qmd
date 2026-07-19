@@ -30,12 +30,13 @@ str(bike)
 ```{r}
 summary(bike)
 ```
+
 - Notes on the above:
 
-  - 14 variables.  Some numeric and some categorical. Numeric are correctly coming in as numbers
-  
+  - 14 variables. Some numeric and some categorical. Numeric are correctly coming in as numbers
+
   - 8760 rows = 365 days x 24 hours
-  
+
   - Categorical variable unique values: 365 dates, 4 seasons, 2 (Y/N) for holiday, 2 (Y/N) for functioning day
 
 - Fix variable names
@@ -85,14 +86,14 @@ bike |>
     subtitle = "Stratified by functioning")
 ```
 
-- Note:  count is zero for all non-functioning observations.  Going forwards, lets subset to omit non-functioning observations
+- Note: count is zero for all non-functioning observations. Going forwards, lets subset to omit non-functioning observations
 
 ```{r}
 bike_valid <- bike |>
   filter(functioning == "Yes")
 ```
 
-- Summarize across hours.  Use the sum of bike_count, rain, and snow.  Use the mean of temp, hum, wind, vis, dewpt, solrad
+- Summarize across hours. Use the sum of bike_count, rain, and snow. Use the mean of temp, hum, wind, vis, dewpt, solrad
 
 ```{r}
 bike_day <- bike_valid |>
@@ -178,7 +179,6 @@ bike_day |>
 
 # temp, dewpt, and solrad have the strongest correlation with bike count
 ```
-
 
 ```{r}
 # Bike Count vs Temp
@@ -291,7 +291,6 @@ bike_test |>
 bike_10_fold <- vfold_cv(bike_train, 10)
 ```
 
-
 ## Fit three different MLR models on the training data using 10 fold CV to find best model
 
 - Create the first recipe:
@@ -307,7 +306,7 @@ recipe(bike_count ~ ., data = bike_train) |>
   bake(bike_train)
 ```
 
-- Looks good.  Save it as `first_rec`
+- Looks good. Save it as `first_rec`
 
 ```{r}
 first_rec <- recipe(bike_count ~ ., data = bike_train) |>
@@ -389,6 +388,7 @@ third_wfl <- workflow() |>
 first_cv_fits <- first_wfl |>
   fit_resamples(bike_10_fold)
 ```
+
 ```{r}
 # Fit the second model
 second_cv_fits <- second_wfl |>
@@ -401,8 +401,8 @@ third_cv_fits <- third_wfl |>
   fit_resamples(bike_10_fold)
 ```
 
-
 ```{r}
+# combined table of fit metrics for the three models
 rbind(first_cv_fits |> collect_metrics(),
       second_cv_fits |> collect_metrics(),
       third_cv_fits |> collect_metrics())
@@ -410,9 +410,23 @@ rbind(first_cv_fits |> collect_metrics(),
 
 - Looks like the third model (with interaction effects and quadratic terms) has the lowest mean RMSE (2970.3 vs 3079.8 and 4248.0).
 
-- Now
+- Obtain the final model by fitting to the entire data set
 
 ```{r}
-
+third_wfl |>
+  last_fit(bike_split) |>
+  collect_metrics()
 ```
 
+- RMSE for the final model is 2955.1
+
+- Obtain the final model coefficient table
+
+```{r}
+final_coefficients <- third_wfl |>
+  last_fit(bike_split) |>
+  extract_fit_parsnip() |>
+  tidy()
+
+kable(final_coefficients)
+```

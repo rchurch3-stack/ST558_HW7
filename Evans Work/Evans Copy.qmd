@@ -141,10 +141,124 @@ daily_bike_data <- fixed_bike_data |>
     across(
       .cols = c(temp_C, humidity_per, wind_speed_mps, visibility_10m, solar_radiation_MJpm2),
       .fns = mean
-    )
+    ),
+    .groups = "drop"
   )
 
 daily_bike_data
+```
+
+```{r}
+summary(daily_bike_data)
+```
+```{r}
+daily_bike_data |>
+  summarise(
+    n = n(),
+    mean = mean(rented_bike_count),
+    median = median(rented_bike_count),
+    sd = sd(rented_bike_count),
+    min = min(rented_bike_count),
+    max = max(rented_bike_count),
+    q1 = quantile(rented_bike_count, 0.25),
+    q3 = quantile(rented_bike_count, 0.75)
+  )
+```
+
+```{r}
+daily_bike_data |>
+  group_by(seasons) |>
+  summarise(
+    n = n(),
+    mean = mean(rented_bike_count),
+    median = median(rented_bike_count),
+    sd = sd(rented_bike_count),
+    min = min(rented_bike_count),
+    max = max(rented_bike_count),
+    q1 = quantile(rented_bike_count, 0.25),
+    q3 = quantile(rented_bike_count, 0.75)
+  )
+```
+
+```{r}
+daily_bike_data |>
+  group_by(holiday) |>
+  summarise(
+    n = n(),
+    mean = mean(rented_bike_count),
+    median = median(rented_bike_count),
+    sd = sd(rented_bike_count),
+    min = min(rented_bike_count),
+    max = max(rented_bike_count),
+    q1 = quantile(rented_bike_count, 0.25),
+    q3 = quantile(rented_bike_count, 0.75)
+  )
+```
+
+```{r}
+daily_bike_data |>
+  select(where(is.numeric)) |>
+  cor(use = "complete.obs")
+```
+```{r}
+library(ggplot2)
+
+ggplot(daily_bike_data, aes(x = seasons, y = rented_bike_count, fill = seasons)) +
+  geom_boxplot() +
+  labs(
+    title = "Daily Bike Rentals by Season",
+    x = "Season",
+    y = "Daily Bike Count"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+ggplot(daily_bike_data, aes(x = holiday, y = rented_bike_count, fill = holiday)) +
+  geom_boxplot() +
+  labs(
+    title = "Daily Bike Rentals on Holidays vs Non-Holidays",
+    x = "Holiday",
+    y = "Daily Bike Count"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+ggplot(daily_bike_data, aes(x = temp_C, y = rented_bike_count)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(
+    title = "Daily Bike Rentals vs Temperature",
+    x = "Average Temperature",
+    y = "Daily Bike Count"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+ggplot(daily_bike_data, aes(x = humidity_per, y = rented_bike_count)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm") +
+  labs(
+    title = "Daily Bike Rentals vs Humidity",
+    x = "Average Humidity",
+    y = "Daily Bike Count"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+daily_bike_data |>
+  filter(rainfall_mm > 0) |>
+  ggplot(aes(x = rainfall_mm, y = rented_bike_count, color = seasons)) +
+  geom_point() +
+  labs(
+    title = "Bike Rentals on Rainy",
+    x = "Rain (mm)",
+    y = "Daily Bike Count"
+  ) +
+  theme_minimal()
 ```
 
 
@@ -163,4 +277,6 @@ bike_CV_fits <- bike_wfl |>
   fit_resamples(bike_10_fold)
 bike_CV_fits
 ```
+
+
 

@@ -11,6 +11,7 @@ library(readr)
 library(dplyr)
 library(lubridate)
 library(tidymodels)
+library(broom)
 ```
 
 Reading in the data.
@@ -265,6 +266,7 @@ daily_bike_data |>
 ## Splitting the Data
 
 ```{r}
+set.seed(123)
 bike_split <- initial_split(daily_bike_data, prop = 0.75, strata = seasons)
 bike_train <- training(bike_split)
 bike_test <- testing(bike_split)
@@ -279,4 +281,167 @@ bike_CV_fits
 ```
 
 ## Fitting MLR Models
+
+```{r}
+recipe1 <- recipe(rented_bike_count ~ ., data = daily_bike_data) |>
+  step_date(date, features = c("dow")) |>
+  step_mutate(
+    day_type = factor(if_else(
+      date_dow %in% c("Sat", "Sun"),
+      "Weekend",
+      "Weekday"
+    ))
+  ) |>
+  step_rm(date, date_dow) |>
+  step_normalize(all_numeric_predictors()) |>
+  step_dummy(all_nominal_predictors())
+```
+
+```{r}
+recipe2 <- recipe(rented_bike_count ~ ., data = daily_bike_data) |>
+  step_date(date, features = "dow") |>
+  step_mutate(
+    day_type = factor(if_else(
+      date_dow %in% c("Sat", "Sun"),
+      "Weekend",
+      "Weekday"
+    ))
+  ) |>
+  step_rm(date, date_dow) |>
+  step_normalize(all_numeric_predictors()) |>
+  step_dummy(all_nominal_predictors()) |>
+  step_interact(
+    terms = ~ starts_with("seasons"):starts_with("holiday")
+  ) |>
+  step_interact(
+    terms = ~ starts_with("seasons"):temp_C
+  ) |>
+  step_interact(
+    terms = ~ temp_C:rainfall_mm
+  )
+```
+
+
+```{r}
+recipe3 <- recipe(rented_bike_count ~ ., data = daily_bike_data) |>
+  step_date(date, features = "dow") |>
+  step_mutate(
+    day_type = factor(if_else(
+      date_dow %in% c("Sat", "Sun"),
+      "Weekend",
+      "Weekday"
+    ))
+  ) |>
+  step_rm(date, date_dow) |>
+  step_normalize(all_numeric_predictors()) |>
+  step_dummy(all_nominal_predictors()) |>
+  step_interact(
+    terms = ~ starts_with("seasons"):starts_with("holiday")
+  ) |>
+  step_interact(
+    terms = ~ starts_with("seasons"):temp_C
+  ) |>
+  step_interact(
+    terms = ~ temp_C:rainfall_mm
+  ) |>
+  step_poly(
+      c(temp_C, humidity_per, wind_speed_mps, visibility_10m,
+      solar_radiation_MJpm2, rainfall_mm, snowfall_cm),
+    degree = 2
+  )
+```
+
+
+```{r}
+lm_model <- linear_reg() |>
+  set_engine("lm")
+```
+
+```{r}
+workflow1 <- workflow() |>
+  add_model(lm_model) |>
+  add_recipe(recipe1)
+
+workflow2 <- workflow() |>
+  add_model(lm_model) |>
+  add_recipe(recipe2)
+
+workflow3 <- workflow() |>
+  add_model(lm_model) |>
+  add_recipe(recipe3)
+```
+
+
+```{r}
+fit1 <- fit_resamples(
+  workflow1,
+  resamples = bike_10_fold,
+  metrics = metric_set(rmse, rsq, mae)
+)
+
+fit2 <- fit_resamples(
+  workflow2,
+  resamples = bike_10_fold,
+  metrics = metric_set(rmse, rsq, mae)
+)
+
+fit3 <- fit_resamples(
+  workflow3,
+  resamples = bike_10_fold,
+  metrics = metric_set(rmse, rsq, mae)
+)
+```
+
+```{r}
+collect_metrics(fit1)
+collect_metrics(fit2)
+collect_metrics(fit3)
+```
+
+
+```{r}
+final_workflow <- workflow() |>
+  add_model(lm_model) |>
+  add_recipe(recipe3)
+
+final_fit <- last_fit(
+  final_workflow,
+  split = bike_split,
+  metrics = metric_set(rmse, rsq, mae)
+)
+
+collect_metrics(final_fit)
+```
+
+```{r}
+final_coefficients <- final_fit |>
+  extract_fit_parsnip() |>
+  tidy()
+
+final_coefficients
+```
+
+
+```{r}
+final_workflow_2 <- workflow() |>
+  add_model(lm_model) |>
+  add_recipe(recipe2)
+
+final_fit_2 <- last_fit(
+  final_workflow_2,
+  split = bike_split,
+  metrics = metric_set(rmse, rsq, mae)
+)
+
+collect_metrics(final_fit_2)
+```
+
+```{r}
+final_coefficients_2 <- final_fit_2 |>
+  extract_fit_parsnip() |>
+  tidy()
+
+final_coefficients_2
+```
+
 

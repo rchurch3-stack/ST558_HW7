@@ -8,211 +8,159 @@ Loading any libraries needed.
 ```{r}
 library(tidyverse)
 library(readr)
-library(janitor)
+library(dplyr)
+library(lubridate)
+library(tidymodels)
 ```
 
 Reading in the data.
 ```{r}
 bike_data <- read_csv("../Data/SeoulBikeData.csv", locale = locale(encoding = "Windows-1252"))
 ```
-
+## EDA
 
 ```{r}
-head(bike_data)
-tail(bike_data)
-
-# Structure
-str(bike_data)
-
-# Dimensions
-dim(bike_data)
-
-# Variable names
-names(bike_data)
+colSums(is.na(bike_data))
 ```
-```{r}
-bike_data <- bike_data |>
-  clean_names()
-
-names(bike_data)
-```
+No missing values!
 
 ```{r}
-bike_data <- bike_data |>
-  mutate(
-    date = as.Date(date, format = "%d/%m/%Y"),
-    seasons = as.factor(seasons),
-    holiday = as.factor(holiday),
-    functioning_day = as.factor(functioning_day)
-  )
-
 str(bike_data)
 ```
-Checking for missing data.
-```{r}
-# Number of missing values
-colSums(is.na(bike))
-
-# Total missing values
-sum(is.na(bike))
-```
-Oh wow! No missing data.
-
-Now for summary.
 ```{r}
 summary(bike_data)
 ```
-
+```{r}
+unique(bike_data$Seasons)
+unique(bike_data$Holiday)
+unique(bike_data$`Functioning Day`)
+unique(bike_data$Date)
+```
 
 
 ```{r}
-#################################################
-# Numerical summaries
-#################################################
+fixed_bike_data <- bike_data |>
+  mutate(
+    seasons = as.factor(Seasons),
+    holiday = as.factor(Holiday),
+    functioning_day = as.factor(`Functioning Day`),
+    Date = dmy(Date)
+  ) |>
+  rename(
+    "date" = "Date",
+    "rented_bike_count" = "Rented Bike Count",
+    "hour" = "Hour",
+    "temp_C" = "Temperature(°C)",
+    "humidity_per" = "Humidity(%)",
+    "wind_speed_mps" = "Wind speed (m/s)",
+    "visibility_10m" = "Visibility (10m)",
+    "dew_point_temp_C" = "Dew point temperature(°C)",
+    "solar_radiation_MJpm2" = "Solar Radiation (MJ/m2)",
+    "rainfall_mm" = "Rainfall(mm)",
+    "snowfall_cm" = "Snowfall (cm)",
+  )
+```
 
-bike %>%
+```{r}
+head(fixed_bike_data)
+```
+
+```{r}
+fixed_bike_data |>
   summarise(
-    Mean_Rentals = mean(rented_bike_count),
-    Median_Rentals = median(rented_bike_count),
-    SD_Rentals = sd(rented_bike_count),
-    Min_Rentals = min(rented_bike_count),
-    Max_Rentals = max(rented_bike_count)
+    n = n(),
+    mean = mean(rented_bike_count),
+    median = median(rented_bike_count),
+    sd = sd(rented_bike_count),
+    min = min(rented_bike_count),
+    max = max(rented_bike_count),
+    q1 = quantile(rented_bike_count, 0.25),
+    q3 = quantile(rented_bike_count, 0.75)
   )
+```
 
-#################################################
-# Frequency tables
-#################################################
-
-table(bike$seasons)
-
-table(bike$holiday)
-
-table(bike$functioning_day)
-
-#################################################
-# Data Manipulation Examples
-#################################################
-
-# Average rentals by season
-bike %>%
-  group_by(seasons) %>%
+```{r}
+fixed_bike_data |>
+  group_by(seasons) |>
   summarise(
-    Average_Rentals = mean(rented_bike_count),
-    Median_Rentals = median(rented_bike_count),
-    Count = n()
+    n = n(),
+    mean = mean(rented_bike_count),
+    median = median(rented_bike_count),
+    sd = sd(rented_bike_count),
+    min = min(rented_bike_count),
+    max = max(rented_bike_count),
+    q1 = quantile(rented_bike_count, 0.25),
+    q3 = quantile(rented_bike_count, 0.75)
   )
+```
 
-# Average rentals by hour
-bike %>%
-  group_by(hour) %>%
+```{r}
+fixed_bike_data |>
+  group_by(holiday) |>
   summarise(
-    Average_Rentals = mean(rented_bike_count)
+    n = n(),
+    mean = mean(rented_bike_count),
+    median = median(rented_bike_count),
+    sd = sd(rented_bike_count),
+    min = min(rented_bike_count),
+    max = max(rented_bike_count),
+    q1 = quantile(rented_bike_count, 0.25),
+    q3 = quantile(rented_bike_count, 0.75)
   )
+```
 
-#################################################
-# Graphical Summaries
-#################################################
-
-# Histogram
-ggplot(bike, aes(rented_bike_count)) +
-  geom_histogram(bins = 30,
-                 fill = "steelblue",
-                 color = "black") +
-  labs(
-    title = "Distribution of Bike Rentals",
-    x = "Number of Bikes Rented",
-    y = "Frequency"
+```{r}
+fixed_bike_data |>
+  group_by(functioning_day) |>
+  summarise(
+    n = n(),
+    mean = mean(rented_bike_count),
+    median = median(rented_bike_count),
+    sd = sd(rented_bike_count),
+    min = min(rented_bike_count),
+    max = max(rented_bike_count),
+    q1 = quantile(rented_bike_count, 0.25),
+    q3 = quantile(rented_bike_count, 0.75)
   )
+```
 
-# Boxplot by season
-ggplot(bike,
-       aes(seasons,
-           rented_bike_count,
-           fill = seasons)) +
-  geom_boxplot() +
-  labs(
-    title = "Bike Rentals by Season",
-    x = "Season",
-    y = "Bike Rentals"
-  ) +
-  theme(legend.position = "none")
-
-# Boxplot by holiday
-ggplot(bike,
-       aes(holiday,
-           rented_bike_count,
-           fill = holiday)) +
-  geom_boxplot() +
-  labs(
-    title = "Bike Rentals by Holiday Status",
-    x = "Holiday",
-    y = "Bike Rentals"
-  ) +
-  theme(legend.position = "none")
-
-# Scatterplot
-ggplot(bike,
-       aes(temperature_c,
-           rented_bike_count)) +
-  geom_point(alpha = 0.4) +
-  geom_smooth(method = "lm", se = FALSE, color = "red") +
-  labs(
-    title = "Bike Rentals vs Temperature",
-    x = "Temperature (°C)",
-    y = "Bike Rentals"
-  )
-
-# Line plot of average rentals by hour
-bike %>%
-  group_by(hour) %>%
-  summarise(avg_rentals = mean(rented_bike_count)) %>%
-  ggplot(aes(hour, avg_rentals)) +
-  geom_line(linewidth = 1.2) +
-  geom_point(size = 2) +
-  labs(
-    title = "Average Bike Rentals by Hour",
-    x = "Hour",
-    y = "Average Rentals"
-  )
-
-#################################################
-# Correlation of numeric variables
-#################################################
-
-numeric_data <- bike %>%
-  select(where(is.numeric))
-
-cor(numeric_data)
-
-# Correlation plot
-GGally::ggpairs(
-  numeric_data %>%
-    select(
-      rented_bike_count,
-      temperature_c,
-      humidity,
-      wind_speed_m_s,
-      visibility_10m,
-      rainfall_mm,
-      snowfall_cm
-    )
-)
-
-#################################################
-# Example filtering/manipulation
-#################################################
-
-# Summer observations only
-summer_bikes <- bike %>%
-  filter(seasons == "Summer")
-
-# Working days only
-working_days <- bike %>%
+```{r}
+fixed_bike_data <- fixed_bike_data |>
   filter(functioning_day == "Yes")
+```
 
-# Top 10 busiest hours
-bike %>%
-  arrange(desc(rented_bike_count)) %>%
-  slice(1:10)
+
+```{r}
+daily_bike_data <- fixed_bike_data |>
+  group_by(date, seasons, holiday) |>
+  summarise(
+    across(
+      .cols = c(rented_bike_count, rainfall_mm, snowfall_cm),
+      .fns = sum
+    ),
+    across(
+      .cols = c(temp_C, humidity_per, wind_speed_mps, visibility_10m, solar_radiation_MJpm2),
+      .fns = mean
+    )
+  )
+
+daily_bike_data
+```
+
+
+## Splitting the Data
+
+```{r}
+bike_split <- initial_split(daily_bike_data, prop = 0.75)
+bike_train <- training(bike_split)
+bike_test <- testing(bike_split)
+```
+
+
+```{r}
+bike_10_fold <- vfold_cv(bike_train, 10)
+bike_CV_fits <- bike_wfl |>
+  fit_resamples(bike_10_fold)
+bike_CV_fits
 ```
 

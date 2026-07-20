@@ -1,8 +1,8 @@
 ---
 title: "Evans Copy"
 format: html
+Authors: "Evan Whitfield, Ryan Friedman, Ralph Church"
 ---
-
 
 Loading any libraries needed.
 ```{r}
@@ -140,7 +140,12 @@ daily_bike_data <- fixed_bike_data |>
       .fns = sum
     ),
     across(
-      .cols = c(temp_C, humidity_per, wind_speed_mps, visibility_10m, solar_radiation_MJpm2),
+      .cols = c(temp_C, 
+                humidity_per, 
+                wind_speed_mps, 
+                visibility_10m, 
+                solar_radiation_MJpm2,
+                dew_point_temp_C),
       .fns = mean
     ),
     .groups = "drop"
@@ -273,14 +278,12 @@ bike_test <- testing(bike_split)
 bike_10_fold <- vfold_cv(bike_train, 10)
 ```
 
+## Fitting MLR Models
 
 ```{r}
-bike_CV_fits <- bike_wfl |>
-  fit_resamples(bike_10_fold)
-bike_CV_fits
+head(daily_bike_data)
 ```
 
-## Fitting MLR Models
 
 ```{r}
 recipe1 <- recipe(rented_bike_count ~ ., data = daily_bike_data) |>
@@ -293,9 +296,14 @@ recipe1 <- recipe(rented_bike_count ~ ., data = daily_bike_data) |>
     ))
   ) |>
   step_rm(date, date_dow) |>
-  step_normalize(all_numeric_predictors()) |>
-  step_dummy(all_nominal_predictors())
+  step_normalize(all_numeric_predictors(), -all_outcomes()) |>
+  step_dummy(seasons, holiday, day_type)
 ```
+
+```{r}
+recipe1 |> prep() |> bake(new_data = NULL) |> names()
+```
+
 
 ```{r}
 recipe2 <- recipe(rented_bike_count ~ ., data = daily_bike_data) |>
@@ -308,10 +316,10 @@ recipe2 <- recipe(rented_bike_count ~ ., data = daily_bike_data) |>
     ))
   ) |>
   step_rm(date, date_dow) |>
-  step_normalize(all_numeric_predictors()) |>
+  step_normalize(all_numeric_predictors(), -all_outcomes()) |>
   step_dummy(all_nominal_predictors()) |>
   step_interact(
-    terms = ~ starts_with("seasons"):starts_with("holiday")
+    terms = ~ starts_with("holiday"):starts_with("seasons")
   ) |>
   step_interact(
     terms = ~ starts_with("seasons"):temp_C
@@ -321,6 +329,10 @@ recipe2 <- recipe(rented_bike_count ~ ., data = daily_bike_data) |>
   )
 ```
 
+
+```{r}
+recipe2 |> prep() |> bake(new_data = NULL) |> names()
+```
 
 ```{r}
 recipe3 <- recipe(rented_bike_count ~ ., data = daily_bike_data) |>
@@ -333,10 +345,9 @@ recipe3 <- recipe(rented_bike_count ~ ., data = daily_bike_data) |>
     ))
   ) |>
   step_rm(date, date_dow) |>
-  step_normalize(all_numeric_predictors()) |>
   step_dummy(all_nominal_predictors()) |>
   step_interact(
-    terms = ~ starts_with("seasons"):starts_with("holiday")
+    terms = ~ starts_with("holiday"):starts_with("seasons")
   ) |>
   step_interact(
     terms = ~ starts_with("seasons"):temp_C
@@ -348,7 +359,13 @@ recipe3 <- recipe(rented_bike_count ~ ., data = daily_bike_data) |>
       c(temp_C, humidity_per, wind_speed_mps, visibility_10m,
       solar_radiation_MJpm2, rainfall_mm, snowfall_cm),
     degree = 2
-  )
+  ) |>
+  step_normalize(all_numeric_predictors(), -all_outcomes())
+
+```
+
+```{r}
+recipe3 |> prep() |> bake(new_data = NULL) |> names()
 ```
 
 
@@ -373,48 +390,33 @@ workflow3 <- workflow() |>
 
 
 ```{r}
-fit1 <- fit_resamples(
-  workflow1,
-  resamples = bike_10_fold,
-  metrics = metric_set(rmse, rsq, mae)
-)
+fit1 <- workflow1 |>
+  fit_resamples(bike_10_fold)
 
-fit2 <- fit_resamples(
-  workflow2,
-  resamples = bike_10_fold,
-  metrics = metric_set(rmse, rsq, mae)
-)
+fit2 <- workflow2 |>
+  fit_resamples(bike_10_fold)
 
-fit3 <- fit_resamples(
-  workflow3,
-  resamples = bike_10_fold,
-  metrics = metric_set(rmse, rsq, mae)
-)
+fit3 <- workflow3 |>
+  fit_resamples(bike_10_fold)
 ```
 
 ```{r}
-collect_metrics(fit1)
-collect_metrics(fit2)
-collect_metrics(fit3)
+rbind(collect_metrics(fit1),
+      collect_metrics(fit2),
+      collect_metrics(fit3)
+)
 ```
 
 
 ```{r}
-final_workflow <- workflow() |>
-  add_model(lm_model) |>
-  add_recipe(recipe3)
-
-final_fit <- last_fit(
-  final_workflow,
-  split = bike_split,
-  metrics = metric_set(rmse, rsq, mae)
-)
-
-collect_metrics(final_fit)
+workflow3 |>
+  last_fit(bike_split) |>
+  collect_metrics()
 ```
 
 ```{r}
-final_coefficients <- final_fit |>
+final_coefficients <- workflow3 |>
+  last_fit(bike_split) |>
   extract_fit_parsnip() |>
   tidy()
 

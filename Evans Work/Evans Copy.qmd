@@ -265,18 +265,18 @@ daily_bike_data |>
 ## Splitting the Data
 
 ```{r}
-bike_split <- initial_split(daily_bike_data, prop = 0.75)
+bike_split <- initial_split(daily_bike_data, prop = 0.75, strata = seasons)
 bike_train <- training(bike_split)
 bike_test <- testing(bike_split)
+bike_10_fold <- vfold_cv(bike_train, 10)
 ```
 
 
 ```{r}
-bike_10_fold <- vfold_cv(bike_train, 10)
 bike_CV_fits <- bike_wfl |>
   fit_resamples(bike_10_fold)
 bike_CV_fits
 ```
 
-
+## Fitting MLR Models
 

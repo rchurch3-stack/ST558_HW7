@@ -4,7 +4,7 @@ format: html
 Authors: "Evan Whitfield, Ryan Friedman, Ralph Church"
 ---
 
-Loading any libraries needed.
+Loading any libraries needed for the assignment
 ```{r}
 library(tidyverse)
 library(readr)
@@ -12,53 +12,73 @@ library(dplyr)
 library(lubridate)
 library(tidymodels)
 library(broom)
+library(ggplot2)
+
 ```
 
-Reading in the data.
+Reading in the data we will be exploring.
 ```{r}
-bike_data <- read_csv("../Data/SeoulBikeData.csv", locale = locale(encoding = "Windows-1252"))
+bike_data <- read_csv("Data/SeoulBikeData.csv", locale = locale(encoding = "Windows-1252"))
 ```
 ## EDA
 
+Check for missingness
 ```{r}
 colSums(is.na(bike_data))
 ```
-No missing values!
+No missing values! We are ready to proceed. 
 
+
+- Begin with `str()` and `summary()` to examine variables
 ```{r}
 str(bike_data)
 ```
+
 ```{r}
 summary(bike_data)
 ```
+- Notes on the above:
+
+  - 14 variables. Some numeric and some categorical. Numeric are correctly coming in as numbers
+
+  - 8760 rows = 365 days x 24 hours
+  
 ```{r}
 unique(bike_data$Seasons)
 unique(bike_data$Holiday)
 unique(bike_data$`Functioning Day`)
-unique(bike_data$Date)
 ```
 
+  - Categorical variable unique values: 365 dates, 4 seasons, 2 (Y/N) for holiday, 2 (Y/N) for functioning day
+
+### Mutating Data Table
+
+ - Convert the Date column into an actual date.
+ 
+ - Turn the character variables (Seasons, Holiday, and Functioning Day) into factors.
+ 
+ - Rename the all the variables to have easy to use names
 
 ```{r}
 fixed_bike_data <- bike_data |>
   mutate(
-    seasons = as.factor(Seasons),
+    season = as.factor(Seasons),
     holiday = as.factor(Holiday),
-    functioning_day = as.factor(`Functioning Day`),
+    functioning = as.factor(`Functioning Day`),
     Date = dmy(Date)
   ) |>
   rename(
     "date" = "Date",
     "rented_bike_count" = "Rented Bike Count",
     "hour" = "Hour",
-    "temp_C" = "Temperature(°C)",
-    "humidity_per" = "Humidity(%)",
-    "wind_speed_mps" = "Wind speed (m/s)",
-    "visibility_10m" = "Visibility (10m)",
-    "dew_point_temp_C" = "Dew point temperature(°C)",
-    "solar_radiation_MJpm2" = "Solar Radiation (MJ/m2)",
-    "rainfall_mm" = "Rainfall(mm)",
-    "snowfall_cm" = "Snowfall (cm)",
+    "temp" = "Temperature(°C)",
+    "humid" = "Humidity(%)",
+    "wind" = "Wind speed (m/s)",
+    "vis" = "Visibility (10m)",
+    "dwpt" = "Dew point temperature(°C)",
+    "solar_rad" = "Solar Radiation (MJ/m2)",
+    "rain" = "Rainfall(mm)",
+    "snow" = "Snowfall (cm)",
   )
 ```
 
@@ -66,6 +86,8 @@ fixed_bike_data <- bike_data |>
 head(fixed_bike_data)
 ```
 
+### Summary Statistics for Rented Bike Counts
+
 ```{r}
 fixed_bike_data |>
   summarise(
@@ -80,9 +102,11 @@ fixed_bike_data |>
   )
 ```
 
+### Grouping by season
+
 ```{r}
 fixed_bike_data |>
-  group_by(seasons) |>
+  group_by(season) |>
   summarise(
     n = n(),
     mean = mean(rented_bike_count),
@@ -94,7 +118,9 @@ fixed_bike_data |>
     q3 = quantile(rented_bike_count, 0.75)
   )
 ```
+More bikes are rented in the warm summer months and Less bike are rented in the cold winter months, based on hourly averages.
 
+### Group by holiday
 ```{r}
 fixed_bike_data |>
   group_by(holiday) |>
@@ -110,9 +136,14 @@ fixed_bike_data |>
   )
 ```
 
+People rent more bikes on average on non-holidays than on holidays based on hourly averages.
+
+
+### Group by Functioning Day
+
 ```{r}
 fixed_bike_data |>
-  group_by(functioning_day) |>
+  group_by(functioning) |>
   summarise(
     n = n(),
     mean = mean(rented_bike_count),
@@ -124,28 +155,31 @@ fixed_bike_data |>
     q3 = quantile(rented_bike_count, 0.75)
   )
 ```
+People cannot rent bikes if it is not a functioning day/hour.
 
+Let's remove the entries that are not functioning.
 ```{r}
 fixed_bike_data <- fixed_bike_data |>
-  filter(functioning_day == "Yes")
+  filter(functioning == "Yes")
 ```
 
+### Turn our data into daily totals instead of hourly totals.
 
 ```{r}
 daily_bike_data <- fixed_bike_data |>
-  group_by(date, seasons, holiday) |>
+  group_by(date, season, holiday) |>
   summarise(
     across(
-      .cols = c(rented_bike_count, rainfall_mm, snowfall_cm),
+      .cols = c(rented_bike_count, rain, snow),
       .fns = sum
     ),
     across(
-      .cols = c(temp_C, 
-                humidity_per, 
-                wind_speed_mps, 
-                visibility_10m, 
-                solar_radiation_MJpm2,
-                dew_point_temp_C),
+      .cols = c(temp, 
+                humid, 
+                wind, 
+                vis, 
+                solar_rad,
+                dwpt),
       .fns = mean
     ),
     .groups = "drop"
@@ -154,26 +188,15 @@ daily_bike_data <- fixed_bike_data |>
 daily_bike_data
 ```
 
+### Summarizing Daily Data
+
 ```{r}
 summary(daily_bike_data)
 ```
-```{r}
-daily_bike_data |>
-  summarise(
-    n = n(),
-    mean = mean(rented_bike_count),
-    median = median(rented_bike_count),
-    sd = sd(rented_bike_count),
-    min = min(rented_bike_count),
-    max = max(rented_bike_count),
-    q1 = quantile(rented_bike_count, 0.25),
-    q3 = quantile(rented_bike_count, 0.75)
-  )
-```
+Lowest day total of bikes rented is 977, but the most is 36149. Lots of variety!
 
 ```{r}
 daily_bike_data |>
-  group_by(seasons) |>
   summarise(
     n = n(),
     mean = mean(rented_bike_count),
@@ -185,6 +208,24 @@ daily_bike_data |>
     q3 = quantile(rented_bike_count, 0.75)
   )
 ```
+Out of the 353 functions days, the median bikes rented was 18563.
+
+```{r}
+daily_bike_data |>
+  group_by(season) |>
+  summarise(
+    n = n(),
+    mean = mean(rented_bike_count),
+    median = median(rented_bike_count),
+    sd = sd(rented_bike_count),
+    min = min(rented_bike_count),
+    max = max(rented_bike_count),
+    q1 = quantile(rented_bike_count, 0.25),
+    q3 = quantile(rented_bike_count, 0.75)
+  )
+```
+Many less bikes rented by day in the winter; however, now we can see that the Autumn daily average is close to the summer daily average.
+
 
 ```{r}
 daily_bike_data |>
@@ -200,16 +241,20 @@ daily_bike_data |>
     q3 = quantile(rented_bike_count, 0.75)
   )
 ```
+The median and mean on Holidays are very different. The sd is larger for Holiday than No Holiday. This makes me think that there are several holidays that have few rentals, but a small amount of holidays that have a very large amount of bike rentals.
 
 ```{r}
 daily_bike_data |>
   select(where(is.numeric)) |>
   cor(use = "complete.obs")
 ```
-```{r}
-library(ggplot2)
+Looking at the correlation table, Temperature and Solar Radiation have the highest magnitude correlation with Rented Bike Count, whereas humidity seems to have the lowest correlation. 
 
-ggplot(daily_bike_data, aes(x = seasons, y = rented_bike_count, fill = seasons)) +
+
+### Boxplot of Rented Bikes by Season
+
+```{r}
+ggplot(daily_bike_data, aes(x = season, y = rented_bike_count, fill = season)) +
   geom_boxplot() +
   labs(
     title = "Daily Bike Rentals by Season",
@@ -218,6 +263,9 @@ ggplot(daily_bike_data, aes(x = seasons, y = rented_bike_count, fill = seasons))
   ) +
   theme_minimal()
 ```
+This shows that bikes are not rented very often in the winter!
+
+### Boxplot of Rented Bikes by Holiday
 
 ```{r}
 ggplot(daily_bike_data, aes(x = holiday, y = rented_bike_count, fill = holiday)) +
@@ -229,9 +277,12 @@ ggplot(daily_bike_data, aes(x = holiday, y = rented_bike_count, fill = holiday))
   ) +
   theme_minimal()
 ```
+Based on the Q1, Med, and Q3 values there are many more bikes rented on non-holidays.
+
+### Daily Bike Rentals vs Temperature
 
 ```{r}
-ggplot(daily_bike_data, aes(x = temp_C, y = rented_bike_count)) +
+ggplot(daily_bike_data, aes(x = temp, y = rented_bike_count)) +
   geom_point() +
   geom_smooth(method = "lm") +
   labs(
@@ -241,9 +292,13 @@ ggplot(daily_bike_data, aes(x = temp_C, y = rented_bike_count)) +
   ) +
   theme_minimal()
 ```
+This shows the positive trend between temperature and bike rentals. There is a group of points that have relatively low bike rentals for the temperature. I wonder if there is anything special/unique about these points. Perhaps it was raining?
+
+
+### Daily Bike Rentals vs Humidity
 
 ```{r}
-ggplot(daily_bike_data, aes(x = humidity_per, y = rented_bike_count)) +
+ggplot(daily_bike_data, aes(x = humid, y = rented_bike_count)) +
   geom_point(alpha = 0.6) +
   geom_smooth(method = "lm") +
   labs(
@@ -253,11 +308,13 @@ ggplot(daily_bike_data, aes(x = humidity_per, y = rented_bike_count)) +
   ) +
   theme_minimal()
 ```
+As shown in the correlation table above, this scatterplot shows a random scatter of points.
+
 
 ```{r}
 daily_bike_data |>
-  filter(rainfall_mm > 0) |>
-  ggplot(aes(x = rainfall_mm, y = rented_bike_count, color = seasons)) +
+  filter(rain > 0) |>
+  ggplot(aes(x = rain, y = rented_bike_count, color = season)) +
   geom_point() +
   labs(
     title = "Bike Rentals on Rainy",
@@ -266,13 +323,14 @@ daily_bike_data |>
   ) +
   theme_minimal()
 ```
-
+When it rains, it appears that there are a lot less bikes rented! These are probably the the low points on the scatterplot above. Here we have colored by season. You can see that the winter months might not have had much rain (probably had snow), but people still did not rent bikes.
 
 ## Splitting the Data
 
+Splitting the data into a training and test split, then making a 10fold cross verification.
 ```{r}
 set.seed(123)
-bike_split <- initial_split(daily_bike_data, prop = 0.75, strata = seasons)
+bike_split <- initial_split(daily_bike_data, prop = 0.75, strata = season)
 bike_train <- training(bike_split)
 bike_test <- testing(bike_split)
 bike_10_fold <- vfold_cv(bike_train, 10)
@@ -285,6 +343,14 @@ head(daily_bike_data)
 ```
 
 
+### Recipe 1
+
+ - We will first create a weekend or weekday variable called day_type
+ 
+ - Set Dummy variables for day_type, season, and holiday
+ 
+ - Normalize all numeric predictors. Use all of them linerly.
+
 ```{r}
 recipe1 <- recipe(rented_bike_count ~ ., data = daily_bike_data) |>
   step_date(date, features = c("dow")) |>
@@ -296,14 +362,17 @@ recipe1 <- recipe(rented_bike_count ~ ., data = daily_bike_data) |>
     ))
   ) |>
   step_rm(date, date_dow) |>
-  step_normalize(all_numeric_predictors(), -all_outcomes()) |>
-  step_dummy(seasons, holiday, day_type)
+  step_dummy(season, holiday, day_type) |>
+  step_normalize(all_numeric_predictors(), -all_outcomes())
 ```
 
 ```{r}
 recipe1 |> prep() |> bake(new_data = NULL) |> names()
 ```
 
+### Recipe 2
+
+- Add interation terms for holiday with season, season with temp, and temp with rain.
 
 ```{r}
 recipe2 <- recipe(rented_bike_count ~ ., data = daily_bike_data) |>
@@ -319,13 +388,13 @@ recipe2 <- recipe(rented_bike_count ~ ., data = daily_bike_data) |>
   step_normalize(all_numeric_predictors(), -all_outcomes()) |>
   step_dummy(all_nominal_predictors()) |>
   step_interact(
-    terms = ~ starts_with("holiday"):starts_with("seasons")
+    terms = ~ starts_with("holiday"):starts_with("season")
   ) |>
   step_interact(
-    terms = ~ starts_with("seasons"):temp_C
+    terms = ~ starts_with("season"):temp
   ) |>
   step_interact(
-    terms = ~ temp_C:rainfall_mm
+    terms = ~ temp:rain
   )
 ```
 
@@ -333,6 +402,10 @@ recipe2 <- recipe(rented_bike_count ~ ., data = daily_bike_data) |>
 ```{r}
 recipe2 |> prep() |> bake(new_data = NULL) |> names()
 ```
+
+### Recipe 3
+
+- Add in a quadratic term for the numeric variables.
 
 ```{r}
 recipe3 <- recipe(rented_bike_count ~ ., data = daily_bike_data) |>
@@ -347,33 +420,32 @@ recipe3 <- recipe(rented_bike_count ~ ., data = daily_bike_data) |>
   step_rm(date, date_dow) |>
   step_dummy(all_nominal_predictors()) |>
   step_interact(
-    terms = ~ starts_with("holiday"):starts_with("seasons")
+    terms = ~ starts_with("holiday"):starts_with("season")
   ) |>
   step_interact(
-    terms = ~ starts_with("seasons"):temp_C
+    terms = ~ starts_with("season"):temp
   ) |>
   step_interact(
-    terms = ~ temp_C:rainfall_mm
+    terms = ~ temp:rain
   ) |>
   step_poly(
-      c(temp_C, humidity_per, wind_speed_mps, visibility_10m,
-      solar_radiation_MJpm2, rainfall_mm, snowfall_cm),
+      c(temp, humid, wind, vis, solar_rad, rain, snow),
     degree = 2
   ) |>
   step_normalize(all_numeric_predictors(), -all_outcomes())
-
 ```
 
 ```{r}
 recipe3 |> prep() |> bake(new_data = NULL) |> names()
 ```
 
-
+Set up our `lm` engine.
 ```{r}
 lm_model <- linear_reg() |>
   set_engine("lm")
 ```
 
+Create our workflows.
 ```{r}
 workflow1 <- workflow() |>
   add_model(lm_model) |>
@@ -388,7 +460,7 @@ workflow3 <- workflow() |>
   add_recipe(recipe3)
 ```
 
-
+Fit our resamples with our workflows.
 ```{r}
 fit1 <- workflow1 |>
   fit_resamples(bike_10_fold)
@@ -400,20 +472,24 @@ fit3 <- workflow3 |>
   fit_resamples(bike_10_fold)
 ```
 
+Collect the metrics to view the best one.
 ```{r}
 rbind(collect_metrics(fit1),
       collect_metrics(fit2),
       collect_metrics(fit3)
 )
 ```
+The third recipe has the lowest RMSE, however, it is not that much lower than the RMSE of recipe 2 while being more complex.
 
-
+Fitting Recipe 3 to the entire training set, then using it on the test set.
 ```{r}
 workflow3 |>
   last_fit(bike_split) |>
   collect_metrics()
 ```
+The RMSE is 2899.
 
+Figuring out the coefficients for our 3rd recipe.
 ```{r}
 final_coefficients <- workflow3 |>
   last_fit(bike_split) |>
@@ -424,26 +500,23 @@ final_coefficients
 ```
 
 
+## Bonus check
+
+Because the 2nd recipe was less complex and almost just as low RMSE, we will check it as well.
 ```{r}
-final_workflow_2 <- workflow() |>
-  add_model(lm_model) |>
-  add_recipe(recipe2)
-
-final_fit_2 <- last_fit(
-  final_workflow_2,
-  split = bike_split,
-  metrics = metric_set(rmse, rsq, mae)
-)
-
-collect_metrics(final_fit_2)
+workflow2 |>
+  last_fit(bike_split) |>
+  collect_metrics()
 ```
+The RMSE for the test set is 3080. Not as low as the 2899 for the 3rd recipe.
 
 ```{r}
-final_coefficients_2 <- final_fit_2 |>
+final_coefficients <- workflow2 |>
+  last_fit(bike_split) |>
   extract_fit_parsnip() |>
   tidy()
 
-final_coefficients_2
+final_coefficients
 ```
 
 

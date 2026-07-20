@@ -9,6 +9,7 @@ library(tidymodels)
 library(lubridate)
 library(janitor)
 library(gt)
+library(knitr)
 ```
 
 ## Read in the data
@@ -269,7 +270,7 @@ g + geom_boxplot(aes(x = holiday, y = bike_count, fill = holiday)) +
 - Split the data 75/25 for training and test
 
 ```{r}
-set.seed(10)
+set.seed(123)
 
 # split 75/25, stratifying by season
 bike_split <- initial_split(bike_day, prop = 0.75, strata = season)

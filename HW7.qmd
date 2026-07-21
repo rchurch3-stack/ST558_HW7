@@ -1,5 +1,5 @@
 ---
-title: "Evans Copy"
+title: "ST 558 Homework 7"
 format: html
 Authors: "Evan Whitfield, Ryan Friedman, Ralph Church"
 ---
@@ -16,13 +16,13 @@ library(ggplot2)
 
 ```
 
-Reading in the data we will be exploring.
+Reading in the Seoul Bike Data that we will be exploring.
 ```{r}
 bike_data <- read_csv("Data/SeoulBikeData.csv", locale = locale(encoding = "Windows-1252"))
 ```
 ## EDA
 
-Check for missingness
+First, we will check for any missing values.
 ```{r}
 colSums(is.na(bike_data))
 ```

@@ -1,7 +1,7 @@
 ---
 title: "ST 558 Homework 7"
 format: html
-Authors: "Evan Whitfield, Ryan Friedman, Ralph Church"
+Author: "Evan Whitfield, Ryan Friedman, Ralph Church"
 ---
 
 Loading any libraries needed for the assignment
